@@ -1,0 +1,51 @@
+{
+  "name": "mental-health-platform",
+  "version": "1.0.0",
+  "description": "A comprehensive mental health platform connecting patients with doctors through AI-powered chat assessment",
+  "main": "index.js",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@hookform/resolvers": "^3.3.0",
+    "@types/node": "^20.0.0",
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "autoprefixer": "^10.4.0",
+    "chart.js": "^4.5.0",
+    "date-fns": "^2.30.0",
+    "firebase": "^11.10.0",
+    "framer-motion": "^10.18.0",
+    "lucide-react": "^0.292.0",
+    "next": "^14.0.0",
+    "openai": "^4.20.0",
+    "postcss": "^8.4.0",
+    "react": "^18.2.0",
+    "react-chartjs-2": "^5.3.0",
+    "react-dom": "^18.2.0",
+    "react-hook-form": "^7.47.0",
+    "react-hot-toast": "^2.5.2",
+    "react-markdown": "^9.0.0",
+    "recharts": "^3.1.0",
+    "remark-gfm": "^4.0.0",
+    "tailwindcss": "^3.3.0",
+    "typescript": "^5.0.0",
+    "zod": "^3.22.0"
+  },
+  "devDependencies": {
+    "eslint": "^8.0.0",
+    "eslint-config-next": "^14.0.0"
+  },
+  "keywords": [
+    "mental-health",
+    "therapy",
+    "chatbot",
+    "appointment-booking",
+    "healthcare"
+  ],
+  "author": "Mental Health Platform Team",
+  "license": "MIT"
+}

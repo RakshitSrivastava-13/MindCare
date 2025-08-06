@@ -1,0 +1,253 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Playfair+Display:wght@400;600;700&display=swap');
+
+:root {
+  --toast-bg: #363636;
+  --toast-color: #fff;
+  --notion-bg: #f7faf7;
+  --notion-card: #f8f5ee;
+  --notion-border: #e0e4e0;
+  --notion-green: #d6eadf;
+  --notion-accent: #b7e4c7;
+  --primary-50: #f0f9ff;
+  --primary-100: #e0f2fe;
+  --primary-200: #bae6fd;
+  --primary-300: #7dd3fc;
+  --primary-400: #38bdf8;
+  --primary-500: #0ea5e9;
+  --primary-600: #0284c7;
+  --primary-700: #0369a1;
+  --primary-800: #075985;
+  --primary-900: #0c4a6e;
+  --primary-950: #082f49;
+}
+
+@layer base {
+  html {
+    font-family: 'Inter', system-ui, sans-serif;
+    background: var(--notion-bg);
+  }
+  h1, h2, h3, h4, h5, h6, .font-serif {
+    font-family: 'Playfair Display', serif;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+  body, .font-sans {
+    @apply text-gray-900 bg-[var(--notion-bg)] transition-colors duration-200;
+    font-family: 'Inter', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  body {
+    @apply bg-white text-gray-900;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-serif;
+  }
+}
+
+@layer components {
+  .notion-card {
+    background: var(--notion-card);
+    border: 1px solid var(--notion-border);
+    border-radius: 18px;
+    box-shadow: 0 2px 8px 0 rgba(60, 60, 60, 0.04);
+    padding: 1.5rem 1.5rem;
+    margin-bottom: 1.5rem;
+    transition: box-shadow 0.2s;
+  }
+  .notion-card:hover {
+    box-shadow: 0 4px 16px 0 rgba(60, 60, 60, 0.08);
+  }
+  .notion-section {
+    background: var(--notion-green);
+    border-radius: 12px;
+    padding: 1.25rem 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+  .notion-heading {
+    font-family: 'EB Garamond', serif;
+    font-size: 2rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .notion-subtle {
+    color: #6b7c6b;
+    font-size: 1rem;
+  }
+  .notion-emoji {
+    font-size: 1.5rem;
+    margin-right: 0.5rem;
+  }
+  .notion-table th, .notion-table td {
+    @apply border-b border-gray-200 px-3 py-2 text-left;
+  }
+  .notion-table th {
+    @apply font-semibold bg-[var(--notion-accent)] text-gray-900;
+  }
+  .notion-table tr:last-child td {
+    border-bottom: none;
+  }
+  .btn-primary {
+    @apply inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-full text-white bg-black hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-colors duration-200;
+  }
+  .btn-secondary {
+    @apply inline-flex items-center justify-center px-6 py-3 border border-black text-base font-medium rounded-full text-black bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-colors duration-200;
+  }
+  .btn-outline {
+    @apply inline-flex items-center justify-center px-6 py-3 border border-white text-base font-medium rounded-full text-white hover:bg-white hover:text-black transition-colors duration-200;
+  }
+  .input-field {
+    @apply block w-full px-4 py-3 border border-gray-300 rounded-full shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-black focus:border-black;
+  }
+  .chat-bubble {
+    @apply rounded-lg p-4 max-w-xs lg:max-w-md;
+  }
+  .chat-bubble-bot {
+    @apply bg-gray-100 text-gray-800;
+  }
+  .chat-bubble-user {
+    @apply bg-primary-600 text-white;
+  }
+  .bg-gradient-primary {
+    @apply bg-gradient-to-r from-primary-600 to-primary-700;
+  }
+  .typing-dots {
+    @apply flex space-x-1;
+  }
+  .typing-dot {
+    @apply w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce;
+  }
+  .section {
+    @apply py-20;
+  }
+  .container {
+    @apply max-w-6xl mx-auto px-8;
+  }
+  .heading-xl {
+    @apply text-4xl md:text-5xl lg:text-6xl font-serif;
+  }
+  .heading-lg {
+    @apply text-3xl md:text-4xl font-serif;
+  }
+  .heading-md {
+    @apply text-2xl md:text-3xl font-serif;
+  }
+  .text-body {
+    @apply text-base md:text-lg text-gray-600;
+  }
+}
+
+@layer utilities {
+  .notion-avatar {
+    width: 96px;
+    height: 96px;
+    border-radius: 50%;
+    border: 4px solid var(--notion-bg);
+    box-shadow: 0 2px 8px 0 rgba(60, 60, 60, 0.08);
+    margin-top: -48px;
+    background: #fff;
+    object-fit: cover;
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  .notion-banner {
+    width: 100vw;
+    max-width: 100vw;
+    height: 220px;
+    object-fit: cover;
+    object-position: center;
+    border-radius: 0 0 24px 24px;
+    margin-bottom: -48px;
+  }
+  .notion-flipclock {
+    font-family: 'Inter', monospace;
+    font-size: 2.5rem;
+    font-weight: 700;
+    background: #e9f5e1;
+    color: #2d3a2e;
+    border-radius: 12px;
+    padding: 0.5rem 1.5rem;
+    display: inline-block;
+    min-width: 120px;
+    text-align: center;
+    letter-spacing: 0.05em;
+  }
+}
+
+/* Animations */
+@keyframes bounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+.animate-bounce {
+  animation: bounce 1s infinite;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.5s ease-out forwards;
+}
+
+/* FAQ Accordion */
+.faq-item {
+  @apply border-b border-gray-200 py-6;
+}
+
+.faq-question {
+  @apply flex justify-between items-center w-full text-left;
+}
+
+.faq-answer {
+  @apply mt-4 text-gray-600;
+}
+
+/* Card Hover Effects */
+.feature-card {
+  @apply transition-all duration-300;
+}
+
+.feature-card:hover {
+  @apply transform -translate-y-2;
+}
+
+/* Image Styles */
+.img-rounded {
+  @apply rounded-lg overflow-hidden;
+}
+
+.img-shadow {
+  @apply shadow-lg;
+}
+
+/* Navigation Styles */
+.nav-link {
+  @apply text-white hover:text-white/80 transition-colors duration-200;
+}
+
+.nav-button {
+  @apply px-6 py-2 bg-white text-black rounded-full hover:bg-gray-100 transition-colors duration-200;
+} 
