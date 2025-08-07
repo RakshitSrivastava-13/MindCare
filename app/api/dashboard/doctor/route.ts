@@ -44,11 +44,17 @@ export async function GET(request: NextRequest) {
     )
     const activePatients = uniqueActivePatients.size
 
-    // Get today's confirmed appointments only
-    const today = new Date().toISOString().split('T')[0]
-    const todayConfirmedAppointments = allAppointments.filter(apt => 
-      apt.date === today && apt.status === 'confirmed'
-    )
+    // Get today's confirmed appointments only - handle timezone properly
+    const now = new Date()
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString().split('T')[0]
+    
+    const todayConfirmedAppointments = allAppointments.filter(apt => {
+      // Normalize the appointment date for comparison
+      const aptDate = apt.date.includes('T') ? apt.date.split('T')[0] : apt.date
+      const isToday = aptDate === today
+      const isConfirmed = apt.status === 'confirmed'
+      return isToday && isConfirmed
+    })
     const todayAppointments = todayConfirmedAppointments.length
 
     // Get pending messages
@@ -60,14 +66,56 @@ export async function GET(request: NextRequest) {
     const pendingMessagesSnapshot = await getDocs(pendingMessagesQuery)
     const pendingMessages = pendingMessagesSnapshot.size
 
-    // Generate sample weekly appointments data (would be calculated from actual data)
-    const weeklyAppointments = [
-      { month: 'Sep', count: 85 },
-      { month: 'Oct', count: 92 },
-      { month: 'Nov', count: 78 },
-      { month: 'Dec', count: 95 },
-      { month: 'Jan', count: 88 }
-    ]
+    // Generate dynamic monthly appointments data for the last 6 months + current + next month
+    const monthlyAppointments = []
+    const currentDate = new Date()
+    
+    // Get current month and extend range to include future months
+    for (let i = 5; i >= -1; i--) { // Include 5 past months + current + 1 future month
+      const monthDate = new Date(currentDate.getFullYear(), currentDate.getMonth() - i, 1)
+      const year = monthDate.getFullYear()
+      const month = monthDate.getMonth()
+      
+      // Get month name
+      const monthName = monthDate.toLocaleDateString('en-US', { month: 'short' })
+      
+      // Filter appointments for this specific month and year
+      const monthAppointments = allAppointments.filter(apt => {
+        if (!apt.date) return false
+        
+        // Handle different date formats more robustly
+        let aptDate
+        if (apt.date instanceof Date) {
+          aptDate = apt.date
+        } else if (typeof apt.date === 'string') {
+          // Handle both "YYYY-MM-DD" and "YYYY-MM-DDTHH:mm:ss" formats
+          aptDate = new Date(apt.date)
+        } else if (apt.date?.toDate && typeof apt.date.toDate === 'function') {
+          // Handle Firestore Timestamp
+          aptDate = apt.date.toDate()
+        } else {
+          return false
+        }
+        
+        // Check if date parsing was successful
+        if (isNaN(aptDate.getTime())) return false
+        
+        const aptYear = aptDate.getFullYear()
+        const aptMonth = aptDate.getMonth()
+        
+        return aptYear === year && 
+               aptMonth === month &&
+               (apt.status === 'confirmed' || apt.status === 'completed' || apt.status === 'pending')
+      })
+      
+      monthlyAppointments.push({
+        month: monthName,
+        count: monthAppointments.length,
+        year: year
+      })
+    }
+
+    console.log('Monthly appointments data for doctor', doctorId, ':', monthlyAppointments)
 
     // Generate sample patient progress data
     const patientProgress = [
@@ -82,7 +130,7 @@ export async function GET(request: NextRequest) {
       activePatients,
       todayAppointments,
       pendingMessages,
-      weeklyAppointments,
+      weeklyAppointments: monthlyAppointments,
       patientProgress
     }
 

@@ -15,6 +15,20 @@ const subscribeToAppointmentUpdates = (listener: () => void) => {
   }
 }
 
+// Global state for dashboard updates
+let dashboardUpdateListeners: Array<() => void> = []
+
+const notifyDashboardUpdate = () => {
+  dashboardUpdateListeners.forEach(listener => listener())
+}
+
+const subscribeToDashboardUpdates = (listener: () => void) => {
+  dashboardUpdateListeners.push(listener)
+  return () => {
+    dashboardUpdateListeners = dashboardUpdateListeners.filter(l => l !== listener)
+  }
+}
+
 // Generic API hook
 function useApi<T>(url: string, dependencies: any[] = []) {
   const [data, setData] = useState<T | null>(null)
@@ -78,6 +92,7 @@ export function useAppointments(doctorId?: string, patientId?: string, date?: st
       const result = await response.json()
       if (result.success) {
         notifyAppointmentUpdate()
+        notifyDashboardUpdate()
         return result.appointment
       } else {
         throw new Error(result.error)
@@ -97,6 +112,7 @@ export function useAppointments(doctorId?: string, patientId?: string, date?: st
       const result = await response.json()
       if (result.success) {
         notifyAppointmentUpdate()
+        notifyDashboardUpdate()
       } else {
         throw new Error(result.error)
       }
@@ -113,6 +129,7 @@ export function useAppointments(doctorId?: string, patientId?: string, date?: st
       const result = await response.json()
       if (result.success) {
         notifyAppointmentUpdate()
+        notifyDashboardUpdate()
       } else {
         throw new Error(result.error)
       }
@@ -131,6 +148,7 @@ export function useAppointments(doctorId?: string, patientId?: string, date?: st
       const result = await response.json()
       if (result.success) {
         notifyAppointmentUpdate()
+        notifyDashboardUpdate()
         return result
       } else {
         throw new Error(result.error)
@@ -268,12 +286,27 @@ export function useAlerts(doctorId?: string, patientId?: string, isRead?: boolea
 // Dashboard hooks
 export function useDoctorDashboard(doctorId: string) {
   const url = `/api/dashboard/doctor?doctorId=${doctorId}`
-  const { data, loading, error } = useApi<{ stats: DashboardStats }>(url, [doctorId])
+  const { data, loading, error, refetch } = useApi<{ stats: DashboardStats }>(url, [doctorId])
+  
+  // Subscribe to global dashboard and appointment updates
+  useEffect(() => {
+    const unsubscribeAppointment = subscribeToAppointmentUpdates(() => {
+      refetch()
+    })
+    const unsubscribeDashboard = subscribeToDashboardUpdates(() => {
+      refetch()
+    })
+    return () => {
+      unsubscribeAppointment()
+      unsubscribeDashboard()
+    }
+  }, [refetch])
   
   return {
     stats: data?.stats,
     loading,
-    error
+    error,
+    refetch
   }
 }
 

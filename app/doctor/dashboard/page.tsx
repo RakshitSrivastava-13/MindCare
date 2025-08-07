@@ -30,29 +30,40 @@ import {
   LineChart,
   Line
 } from 'recharts'
-import { useDoctorDashboard, useAppointments, useAlerts, useDoctorId } from '@/hooks/useApi'
+import { useDoctorDashboard, useAppointments, useAlerts, useDoctorId, usePatients } from '@/hooks/useApi'
 
 export default function DoctorDashboard() {
   const { user, userProfile } = useAuth()
   const [showNotifications, setShowNotifications] = useState(false)
   const [updatingAppointment, setUpdatingAppointment] = useState<string | null>(null)
+  const [showPatientsModal, setShowPatientsModal] = useState<'total' | 'active' | null>(null)
   const notificationRef = useRef<HTMLDivElement>(null)
+  const modalRef = useRef<HTMLDivElement>(null)
   
   // Get doctor ID from user ID
   const { doctorId, loading: doctorIdLoading } = useDoctorId(user?.uid)
   
   // Fetch real data using doctor ID
-  const { stats, loading: statsLoading } = useDoctorDashboard(doctorId || '')
+  const { stats, loading: statsLoading, refetch: refetchStats } = useDoctorDashboard(doctorId || '')
   const { appointments, refetch: refetchAppointments } = useAppointments(doctorId || undefined)
+  const { patients } = usePatients(doctorId || undefined)
   
   // Only fetch alerts when we have a valid doctorId to prevent showing all doctors' alerts
   const alertsResult = useAlerts(doctorId || undefined, undefined, false)
   const alerts = doctorId ? alertsResult.alerts : [] // Only use alerts if we have a valid doctorId
 
-  // Get today's schedule
-  const todayDate = new Date().toISOString().split('T')[0]
+  // Get today's schedule - handle timezone properly
+  const now = new Date()
+  const todayDate = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString().split('T')[0]
+  
   const todaySchedule = appointments
-    .filter(appointment => appointment.date === todayDate && appointment.status === 'confirmed')
+    .filter(appointment => {
+      // Normalize the appointment date for comparison
+      const aptDate = appointment.date.includes('T') ? appointment.date.split('T')[0] : appointment.date
+      const isToday = aptDate === todayDate
+      const isConfirmed = appointment.status === 'confirmed'
+      return isToday && isConfirmed
+    })
     .slice(0, 2) // Show only first 2 appointments
 
   // Get unread alerts - only count them if we have a valid doctorId
@@ -107,10 +118,65 @@ export default function DoctorDashboard() {
     })))
   }
   
+    // Debug logging for stats updates
+  useEffect(() => {
+    if (stats) {
+      console.log('Dashboard stats updated:', {
+        totalPatients: stats.totalPatients,
+        activePatients: stats.activePatients,
+        todayAppointments: stats.todayAppointments,
+        monthlyAppointments: stats.weeklyAppointments,
+        doctorId: doctorId,
+        timestamp: new Date().toISOString()
+      })
+    }
+  }, [stats, doctorId])
+
   const pendingAppointmentsCount = actionablePendingAppointments.length
   const totalUnreadAlerts = doctorId ? pendingAppointmentsCount : 0 // Total count for notification
   const displayAlerts = doctorId ? alerts.slice(0, 2) : [] // Show only first 2 for UI
   const pendingAppointments = actionablePendingAppointments // Use filtered appointments
+
+  // Prepare patient data for modals
+  const totalPatientsData = appointments
+    .filter(apt => apt.status === 'confirmed')
+    .reduce((acc, apt) => {
+      const existing = acc.find(p => p.patientId === apt.patientId)
+      if (!existing) {
+        acc.push({
+          patientId: apt.patientId,
+          patientName: apt.patientName,
+          email: patients.find(p => p.id === apt.patientId)?.email || 'Not available',
+          appointmentDate: apt.date,
+          appointmentTime: apt.time,
+          status: apt.status,
+          type: apt.type
+        })
+      }
+      return acc
+    }, [] as any[])
+
+  const recentDate = new Date()
+  recentDate.setDate(recentDate.getDate() - 30) // Last 30 days
+  const recentDateString = recentDate.toISOString().split('T')[0]
+  
+  const activePatientsData = appointments
+    .filter(apt => apt.status === 'confirmed' && apt.date >= recentDateString)
+    .reduce((acc, apt) => {
+      const existing = acc.find(p => p.patientId === apt.patientId)
+      if (!existing) {
+        acc.push({
+          patientId: apt.patientId,
+          patientName: apt.patientName,
+          email: patients.find(p => p.id === apt.patientId)?.email || 'Not available',
+          appointmentDate: apt.date,
+          appointmentTime: apt.time,
+          status: apt.status,
+          type: apt.type
+        })
+      }
+      return acc
+    }, [] as any[])
 
   // Handle notification dropdown
   const toggleNotifications = () => {
@@ -133,12 +199,15 @@ export default function DoctorDashboard() {
       const result = await response.json()
       
       if (result.success) {
-        // Refresh appointments data without page reload
-        await refetchAppointments()
+        // Refresh both appointments and dashboard stats without page reload
+        await Promise.all([
+          refetchAppointments(),
+          refetchStats()
+        ])
         
         // Show success message
         const actionText = status === 'confirmed' ? 'confirmed' : 'cancelled'
-        console.log(`Appointment ${actionText} successfully`)
+        console.log(`Appointment ${actionText} successfully - monthly chart should update`)
         
         // Close notification dropdown after successful action
         setShowNotifications(false)
@@ -164,21 +233,25 @@ export default function DoctorDashboard() {
     }
   }
 
-  // Close notifications when clicking outside or pressing Escape
+  // Close notifications and modals when clicking outside or pressing Escape
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (notificationRef.current && !notificationRef.current.contains(event.target as Node)) {
         setShowNotifications(false)
+      }
+      if (modalRef.current && !modalRef.current.contains(event.target as Node)) {
+        setShowPatientsModal(null)
       }
     }
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         setShowNotifications(false)
+        setShowPatientsModal(null)
       }
     }
 
-    if (showNotifications) {
+    if (showNotifications || showPatientsModal) {
       document.addEventListener('mousedown', handleClickOutside)
       document.addEventListener('keydown', handleKeyDown)
     }
@@ -187,7 +260,7 @@ export default function DoctorDashboard() {
       document.removeEventListener('mousedown', handleClickOutside)
       document.removeEventListener('keydown', handleKeyDown)
     }
-  }, [showNotifications])
+  }, [showNotifications, showPatientsModal])
 
   if (statsLoading || doctorIdLoading) {
     return (
@@ -223,13 +296,13 @@ export default function DoctorDashboard() {
                 onClick={toggleNotifications}
                 className="relative p-2 text-gray-500 hover:text-gray-700 rounded-full hover:bg-gray-100 transition-colors"
               >
-                <Bell className="w-6 h-6" />
-                {totalUnreadAlerts > 0 && (
-                  <span className="absolute top-0 right-0 w-4 h-4 bg-red-500 text-white text-xs flex items-center justify-center rounded-full">
-                    {totalUnreadAlerts}
-                  </span>
-                )}
-              </button>
+                  <Bell className="w-6 h-6" />
+                  {totalUnreadAlerts > 0 && (
+                    <span className="absolute top-0 right-0 w-4 h-4 bg-red-500 text-white text-xs flex items-center justify-center rounded-full">
+                      {totalUnreadAlerts}
+                    </span>
+                  )}
+                </button>
 
               {/* Notification Dropdown */}
               {showNotifications && (
@@ -356,7 +429,10 @@ export default function DoctorDashboard() {
 
         {/* Quick Stats */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white rounded-xl shadow-sm p-6">
+          <button
+            onClick={() => setShowPatientsModal('total')}
+            className="bg-white rounded-xl shadow-sm p-6 hover:shadow-md transition-shadow cursor-pointer text-left"
+          >
             <div className="flex items-center justify-between mb-4">
               <div className="p-2 bg-green-100 rounded-lg">
                 <Users className="w-6 h-6 text-[#1a2f1a]" />
@@ -365,9 +441,13 @@ export default function DoctorDashboard() {
             </div>
             <h3 className="text-2xl font-bold mb-1">{stats?.totalPatients || 0}</h3>
             <p className="text-gray-500">Total Patients</p>
-          </div>
+            <p className="text-xs text-blue-600 mt-1">Click to view details</p>
+          </button>
 
-          <div className="bg-white rounded-xl shadow-sm p-6">
+          <button
+            onClick={() => setShowPatientsModal('active')}
+            className="bg-white rounded-xl shadow-sm p-6 hover:shadow-md transition-shadow cursor-pointer text-left"
+          >
             <div className="flex items-center justify-between mb-4">
               <div className="p-2 bg-blue-100 rounded-lg">
                 <Activity className="w-6 h-6 text-blue-600" />
@@ -376,7 +456,8 @@ export default function DoctorDashboard() {
             </div>
             <h3 className="text-2xl font-bold mb-1">{stats?.activePatients || 0}</h3>
             <p className="text-gray-500">Active Patients</p>
-          </div>
+            <p className="text-xs text-blue-600 mt-1">Click to view details</p>
+          </button>
 
           <div className="bg-white rounded-xl shadow-sm p-6">
             <div className="flex items-center justify-between mb-4">
@@ -431,18 +512,55 @@ export default function DoctorDashboard() {
           {/* Charts */}
           <div className="col-span-12 lg:col-span-8">
             <div className="bg-white rounded-xl shadow-sm p-6 mb-8">
-              <h2 className="text-xl font-medium mb-6">Monthly Appointments</h2>
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h2 className="text-xl font-medium">Monthly Appointments</h2>
+                  <p className="text-sm text-gray-500 mt-1">
+                    Confirmed and completed appointments over the last 6 months
+                  </p>
+                </div>
+                <div className="text-sm text-gray-400">
+                  Total: {stats?.weeklyAppointments?.reduce((sum, month) => sum + month.count, 0) || 0}
+                </div>
+              </div>
               <div className="h-[300px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={stats?.weeklyAppointments || []}>
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="month" />
-                    <YAxis />
-                    <Tooltip />
-                    <Bar dataKey="count" fill="#1a2f1a" />
+                    <XAxis 
+                      dataKey="month" 
+                      fontSize={12}
+                      tick={{ fill: '#6B7280' }}
+                    />
+                    <YAxis 
+                      fontSize={12}
+                      tick={{ fill: '#6B7280' }}
+                    />
+                    <Tooltip 
+                      contentStyle={{
+                        backgroundColor: '#fff',
+                        border: '1px solid #e5e7eb',
+                        borderRadius: '8px',
+                        boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'
+                      }}
+                      formatter={(value: any) => [value, 'Appointments']}
+                      labelFormatter={(label: any) => `${label} 2025`}
+                    />
+                    <Bar 
+                      dataKey="count" 
+                      fill="#1a2f1a" 
+                      radius={[4, 4, 0, 0]}
+                      name="Appointments"
+                    />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
+              {stats?.weeklyAppointments?.length === 0 && (
+                <div className="text-center py-8 text-gray-500">
+                  <Calendar className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                  <p>No appointment data available</p>
+                </div>
+              )}
             </div>
 
             <div className="bg-white rounded-xl shadow-sm p-6">
@@ -562,9 +680,126 @@ export default function DoctorDashboard() {
               </div>
             </div>
           </div>
+          </div>
         </div>
-        </div>
+
+        {/* Patients Modal */}
+        {showPatientsModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div ref={modalRef} className="bg-white rounded-xl shadow-xl max-w-4xl w-full max-h-[80vh] overflow-hidden">
+              {/* Modal Header */}
+              <div className="flex items-center justify-between p-6 border-b border-gray-200">
+                <div>
+                  <h2 className="text-xl font-semibold text-gray-900">
+                    {showPatientsModal === 'total' ? 'Total Patients' : 'Active Patients'}
+                  </h2>
+                  <p className="text-sm text-gray-500 mt-1">
+                    {showPatientsModal === 'total' 
+                      ? `${totalPatientsData.length} patients with confirmed appointments`
+                      : `${activePatientsData.length} patients with appointments in the last 30 days`
+                    }
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowPatientsModal(null)}
+                  className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Modal Content */}
+              <div className="p-6 overflow-y-auto max-h-[calc(80vh-120px)]">
+                {(showPatientsModal === 'total' ? totalPatientsData : activePatientsData).length > 0 ? (
+                  <div className="grid gap-4">
+                    {(showPatientsModal === 'total' ? totalPatientsData : activePatientsData).map((patient, index) => (
+                      <div key={`${patient.patientId}-${index}`} className="bg-gray-50 rounded-lg p-4 hover:bg-gray-100 transition-colors">
+                        <div className="flex items-start gap-4">
+                          <div className="flex-shrink-0">
+                            <Image
+                              src={`https://ui-avatars.com/api/?name=${patient.patientName}&background=f3f4f6&color=374151`}
+                              alt={patient.patientName}
+                              width={48}
+                              height={48}
+                              className="rounded-full"
+                            />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between mb-2">
+                              <h3 className="text-lg font-medium text-gray-900">
+                                {patient.patientName}
+                              </h3>
+                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                patient.status === 'confirmed' 
+                                  ? 'bg-green-100 text-green-800' 
+                                  : 'bg-yellow-100 text-yellow-800'
+                              }`}>
+                                {patient.status}
+                              </span>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <div>
+                                <p className="text-sm text-gray-500 mb-1">Email</p>
+                                <p className="text-sm font-medium text-gray-900">{patient.email}</p>
+                              </div>
+                              <div>
+                                <p className="text-sm text-gray-500 mb-1">Appointment Type</p>
+                                <p className="text-sm font-medium text-gray-900">{patient.type}</p>
+                              </div>
+                              <div>
+                                <p className="text-sm text-gray-500 mb-1">Appointment Date</p>
+                                <p className="text-sm font-medium text-gray-900 flex items-center gap-1">
+                                  <Calendar className="w-4 h-4 text-gray-400" />
+                                  {new Date(patient.appointmentDate).toLocaleDateString()}
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-sm text-gray-500 mb-1">Appointment Time</p>
+                                <p className="text-sm font-medium text-gray-900 flex items-center gap-1">
+                                  <Clock className="w-4 h-4 text-gray-400" />
+                                  {patient.appointmentTime}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-12">
+                    <Users className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">No patients found</h3>
+                    <p className="text-gray-500">
+                      {showPatientsModal === 'total' 
+                        ? 'No patients with confirmed appointments yet.'
+                        : 'No active patients in the last 30 days.'
+                      }
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Modal Footer */}
+              <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-200 bg-gray-50">
+                <button
+                  onClick={() => setShowPatientsModal(null)}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#1a2f1a]"
+                >
+                  Close
+                </button>
+                <Link
+                  href="/doctor/patients"
+                  onClick={() => setShowPatientsModal(null)}
+                  className="px-4 py-2 text-sm font-medium text-white bg-[#1a2f1a] border border-transparent rounded-lg hover:bg-[#2d4a2d] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#1a2f1a]"
+                >
+                  View All Patients
+                </Link>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </ProtectedRoute>
   )
-} 
+}
